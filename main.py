@@ -34,6 +34,8 @@ class PromptRequest(BaseModel):
 local_models = {}
 
 cache_dir = "./model"  # Directory to cache models locally
+# Creates the directory and does nothing if directory is already there.
+os.makedirs(cache_dir, exist_ok=True)
 
 def model_is_cached(model_name: str) -> bool:
     """Return True when a local model snapshot already exists in the cache directory."""
