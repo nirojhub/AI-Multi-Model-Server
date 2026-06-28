@@ -12,6 +12,8 @@ Description: Main program for a local GPU multi-model server that loads open-sou
 # pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu132
 # pip install "fastapi[standard]"
 
+import os
+
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -31,6 +33,17 @@ class PromptRequest(BaseModel):
 # Dictionary to hold our loaded models and tokenizers
 local_models = {}
 
+cache_dir = "./model"  # Directory to cache models locally
+
+def model_is_cached(model_name: str) -> bool:
+    """Return True when a local model snapshot already exists in the cache directory."""
+    repo_folder = model_name.replace("/", "--")
+    snapshot_dir = os.path.join(cache_dir, f"models--{repo_folder}", "snapshots")
+    if not os.path.isdir(snapshot_dir):
+        return False
+
+    return any(os.path.isdir(os.path.join(snapshot_dir, entry)) for entry in os.listdir(snapshot_dir))
+
 
 @app.on_event("startup")
 def load_models_to_gpu():
@@ -42,17 +55,18 @@ def load_models_to_gpu():
     # Model 1 Configuration (e.g., Qwen2.5-0.5B) into locally cached directory
     model1_name = "Qwen/Qwen2.5-0.5B-Instruct"
     print(f"Loading {model1_name}...")
+    # check the model is present in local cache or not, if not download it from huggingface and store it in local cache
     local_models["model_one"] = {
-        "tokenizer": AutoTokenizer.from_pretrained(model1_name, cache_dir="./model"),
-        "model": AutoModelForCausalLM.from_pretrained(model1_name, cache_dir="./model").to(device)
+        "tokenizer": AutoTokenizer.from_pretrained(model1_name, cache_dir=cache_dir,  local_files_only=model_is_cached(model1_name)),
+        "model": AutoModelForCausalLM.from_pretrained(model1_name, cache_dir=cache_dir,  local_files_only=model_is_cached(model1_name)).to(device)
     }
 
     # Model 2 Configuration (e.g., Llama-3.2-1B) into locally cached directory
     model2_name = "meta-llama/Llama-3.2-1B"
     print(f"Loading {model2_name}...")
     local_models["model_two"] = {
-        "tokenizer": AutoTokenizer.from_pretrained(model2_name, cache_dir="./model"),
-        "model": AutoModelForCausalLM.from_pretrained(model2_name, cache_dir="./model").to(device)
+        "tokenizer": AutoTokenizer.from_pretrained(model2_name, cache_dir=cache_dir,  local_files_only=model_is_cached(model2_name)),
+        "model": AutoModelForCausalLM.from_pretrained(model2_name, cache_dir=cache_dir,  local_files_only=model_is_cached(model2_name)).to(device)
     }
     print("All models successfully loaded into GPU memory!")
 
